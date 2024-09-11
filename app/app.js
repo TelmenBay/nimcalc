@@ -4,9 +4,9 @@ export function nimGameWinner(piles) {
         nimSum ^= pile; // XOR operation
     }
 
-    if (nimSum === 0) {
-        return "Second player wins if both play optimally.";
-    } else {
-        return "First player wins if both play optimally.";
-    }
+    let resultMessage = nimSum === 0
+        ? "Second player wins if both play optimally."
+        : "First player wins if both play optimally.";
+
+    return { nimSum, resultMessage };
 }

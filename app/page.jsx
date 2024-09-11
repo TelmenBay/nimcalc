@@ -7,17 +7,16 @@ export default function NimGame() {
   const [numPiles, setNumPiles] = useState('');
   const [piles, setPiles] = useState([]);
   const [result, setResult] = useState('');
+  const [nimSum, setNimSum] = useState(null);
 
   // Update the number of piles and generate empty fields
   const handleNumPilesChange = (event) => {
     const value = event.target.value;
     setNumPiles(value);
-    console.log("Number of piles changed to:", value);
 
-
-    // Generate an array of empty strings based on the number of piles
-    if (value >= 0) {
-      setPiles(Array.from({ length: parseInt(value, 10) }, () => ''));
+    if (value && !isNaN(value) && value >= 0) {
+      const num = parseInt(value, 10);
+      setPiles(Array.from({ length: num }, () => ''));
     } else {
       setPiles([]);
     }
@@ -34,12 +33,12 @@ export default function NimGame() {
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    // Convert pile strings to integers
     const pileNumbers = piles.map((pile) => parseInt(pile, 10));
 
     // Use nimGameWinner function from app.js
-    const gameResult = nimGameWinner(pileNumbers);
-    setResult(gameResult);
+    const { nimSum, resultMessage } = nimGameWinner(pileNumbers);
+    setResult(resultMessage);
+    setNimSum(nimSum);
   };
 
   return (
@@ -79,6 +78,12 @@ export default function NimGame() {
       {result && (
         <Typography variant="h6" sx={{ marginTop: 2 }}>
           Result: {result}
+        </Typography>
+      )}
+
+      {nimSum !== null && (
+        <Typography variant="h6" sx={{ marginTop: 2 }}>
+          Nim Sum: {nimSum}
         </Typography>
       )}
     </Box>
