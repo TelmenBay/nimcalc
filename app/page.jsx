@@ -1,103 +1,143 @@
-'use client'
+// page.jsx
+'use client';
 import React, { useState } from 'react';
-import { Box, TextField, Button, Typography } from '@mui/material';
-import { nimGameWinner } from './app'; // Adjust the path as needed
 
-export default function NimGame() {
-  const [numPiles, setNumPiles] = useState('');
-  const [piles, setPiles] = useState([]);
-  const [result, setResult] = useState('');
-  const [nimSum, setNimSum] = useState(null);
-  const [calculationSteps, setCalculationSteps] = useState([]); // New state for calculation steps
+const alpha = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
 
-  // Update the number of piles and generate empty fields
-  const handleNumPilesChange = (event) => {
-    const value = event.target.value;
-    setNumPiles(value);
+let nnnMemoR = {};
 
-    if (value && !isNaN(value) && value >= 0) {
-      const num = parseInt(value, 10);
-      setPiles(Array.from({ length: num }, () => ''));
-    } else {
-      setPiles([]);
+function nnnCalc(piles, adj_matrix, setLogs) {
+  nnnMemoR = {};
+  let maxNimValue = 0;
+  let logs = [];
+  for (let i = 0; i < piles.length; i++) {
+    logs.push(`Calculating nim value starting with pile ${alpha[i]}`);
+    maxNimValue = Math.max(maxNimValue, nnnCalcR(piles, adj_matrix, i, logs));
+  }
+  setLogs(logs);
+  return maxNimValue;
+}
+
+function nnnCalcR(piles, adj_matrix, lastPile, logs) {
+  let key = alpha[lastPile] + JSON.stringify(piles);
+  
+  if (nnnMemoR.hasOwnProperty(key)) {
+    logs.push(`Using memoized value for key ${key}: ${nnnMemoR[key]}`);
+    return nnnMemoR[key];
+  }
+  
+  logs.push(`Processing configuration for key ${key}`);
+  
+  let end_game = true;
+  for (let neighbor_pile = 0; neighbor_pile < piles.length; neighbor_pile++) {
+    if (adj_matrix[lastPile][neighbor_pile] === 1 && piles[neighbor_pile] > 0) {
+      end_game = false;
+      break;
     }
+  }
+  
+  if (end_game) {
+    nnnMemoR[key] = 0;
+    logs.push(`Game over for key ${key}, storing mex value 0`);
+    return 0;
+  }
+  
+  let optionsValSet = new Set();
+  for (let neighbor_pile = 0; neighbor_pile < piles.length; neighbor_pile++) {
+    if (adj_matrix[lastPile][neighbor_pile] === 1 && piles[neighbor_pile] > 0) {
+      for (let stones_to_remove = 1; stones_to_remove <= piles[neighbor_pile]; stones_to_remove++) {
+        let new_piles = [...piles];
+        new_piles[neighbor_pile] -= stones_to_remove;
+        logs.push(`Removing ${stones_to_remove} stones from pile ${alpha[neighbor_pile]}, new configuration: ${JSON.stringify(new_piles)}`);
+        optionsValSet.add(nnnCalcR(new_piles, adj_matrix, neighbor_pile, logs));
+      }
+    }
+  }
+  
+  let mex_value = calcMex(optionsValSet);
+  logs.push(`Mex value for key ${key} is ${mex_value}`);
+  nnnMemoR[key] = mex_value;
+  
+  return mex_value;
+}
+
+function calcMex(optionsValSet) {
+  let mex = 0;
+  while (optionsValSet.has(mex)) {
+    mex++;
+  }
+  return mex;
+}
+
+const Page = () => {
+  const [selectedOption, setSelectedOption] = useState(0);
+  const [nimValue, setNimValue] = useState(null);
+  const [logs, setLogs] = useState([]);
+
+  const configurations = [
+    { piles: [3, 2, 4, 2], adjM: [[1, 1, 1, 0], [1, 1, 1, 1], [1, 1, 1, 1], [0, 1, 1, 1]] },
+    { piles: [2, 1, 1], adjM: [[1, 1, 0], [1, 1, 1], [0, 1, 1]] },
+    { piles: [1, 1], adjM: [[1, 1], [1, 1]] },
+    { piles: [2, 1, 1, 1], adjM: [[1, 1, 1, 0], [1, 1, 1, 1], [1, 1, 1, 1], [0, 1, 1, 1]] }
+  ];
+
+  const handleSelect = (event) => {
+    setSelectedOption(parseInt(event.target.value, 10));
   };
 
-  // Update the pile values
-  const handlePileChange = (index, event) => {
-    const newPiles = [...piles];
-    newPiles[index] = event.target.value;
-    setPiles(newPiles);
-  };
-
-  // Handle form submission
-  const handleSubmit = (event) => {
-    event.preventDefault();
-
-    const pileNumbers = piles.map((pile) => parseInt(pile, 10)).filter(Boolean); // Ensure valid numbers
-
-    console.log("Pile Numbers:", pileNumbers); // Log the input to check its contents
-
-    // Use nimGameWinner function from app.js
-    const resultFromNimGame = nimGameWinner(pileNumbers);
-    console.log(resultFromNimGame); // Debugging line
-    const { nimSum, resultMessage, steps = [] } = resultFromNimGame; // Default to empty array
-    setResult(resultMessage);
-    setNimSum(nimSum);
-    setCalculationSteps(steps); // Store calculation steps
+  const handleCalculate = () => {
+    const { piles, adjM } = configurations[selectedOption];
+    const result = nnnCalc(piles, adjM, setLogs);
+    setNimValue(result);
   };
 
   return (
-    <Box sx={{ padding: 2 }}>
-      <Typography variant="h4" gutterBottom>
-        Nim Game
-      </Typography>
-      <form onSubmit={handleSubmit}>
-        <TextField
-          label="Number of piles"
-          type="number"
-          value={numPiles}
-          onChange={handleNumPilesChange}
-          required
-          fullWidth
-          sx={{ marginBottom: 2 }}
-        />
+    <div style={{ padding: '20px' }}>
+      <h1>Nim Game Calculation</h1>
+      <label htmlFor="configSelect">Choose a configuration: </label>
+      <select id="configSelect" value={selectedOption} onChange={handleSelect}>
+        <option value={0}>Option 1: Piles [3, 2, 4, 2]</option>
+        <option value={1}>Option 2: Piles [2, 1, 1]</option>
+        <option value={2}>Option 3: Piles [1, 1]</option>
+        <option value={3}>Option 4: Piles [2, 1, 1, 1]</option>
+      </select>
 
-        {piles.map((pile, index) => (
-          <TextField
-            key={index}
-            label={`Pile ${index + 1} stones`}
-            type="number"
-            value={pile}
-            onChange={(event) => handlePileChange(index, event)}
-            required
-            fullWidth
-            sx={{ marginBottom: 1 }}
-          />
-        ))}
+      <button style={{ marginLeft: '10px' }} onClick={handleCalculate}>Calculate</button>
 
-        <Button type="submit" variant="contained" color="primary">
-          Find Winner
-        </Button>
-      </form>
-
-      {result && (
-        <Typography variant="h6" sx={{ marginTop: 2 }}>
-          Result: {result}
-        </Typography>
+      {nimValue !== null && (
+        <div style={{
+          marginTop: '20px',
+          padding: '10px',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          width: '300px',
+          textAlign: 'center',
+          backgroundColor: '#f9f9f9'
+        }}>
+          <h2>Calculated Nim Value</h2>
+          <p>{nimValue}</p>
+        </div>
       )}
 
-      {nimSum !== null && (
-        <Typography variant="h6" sx={{ marginTop: 2 }}>
-          Nim Sum: {nimSum}
-        </Typography>
+      {logs.length > 0 && (
+        <div style={{
+          marginTop: '20px',
+          padding: '10px',
+          border: '1px solid #ccc',
+          borderRadius: '4px',
+          backgroundColor: '#f1f1f1',
+          whiteSpace: 'pre-wrap',
+          maxHeight: '300px',
+          overflowY: 'auto'
+        }}>
+          <h3>Calculation Steps</h3>
+          {logs.map((log, index) => (
+            <p key={index}>{log}</p>
+          ))}
+        </div>
       )}
-
-      {calculationSteps.length > 0 && ( // Display calculation steps
-        <Typography variant="h6" sx={{ marginTop: 2 }}>
-          Calculation Steps: {calculationSteps.join(', ')}
-        </Typography>
-      )}
-    </Box>
+    </div>
   );
-}
+};
+
+export default Page;
