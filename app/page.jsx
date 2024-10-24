@@ -8,6 +8,7 @@ export default function NimGame() {
   const [piles, setPiles] = useState([]);
   const [result, setResult] = useState('');
   const [nimSum, setNimSum] = useState(null);
+  const [calculationSteps, setCalculationSteps] = useState([]); // New state for calculation steps
 
   // Update the number of piles and generate empty fields
   const handleNumPilesChange = (event) => {
@@ -33,12 +34,17 @@ export default function NimGame() {
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    const pileNumbers = piles.map((pile) => parseInt(pile, 10));
+    const pileNumbers = piles.map((pile) => parseInt(pile, 10)).filter(Boolean); // Ensure valid numbers
+
+    console.log("Pile Numbers:", pileNumbers); // Log the input to check its contents
 
     // Use nimGameWinner function from app.js
-    const { nimSum, resultMessage } = nimGameWinner(pileNumbers);
+    const resultFromNimGame = nimGameWinner(pileNumbers);
+    console.log(resultFromNimGame); // Debugging line
+    const { nimSum, resultMessage, steps = [] } = resultFromNimGame; // Default to empty array
     setResult(resultMessage);
     setNimSum(nimSum);
+    setCalculationSteps(steps); // Store calculation steps
   };
 
   return (
@@ -84,6 +90,12 @@ export default function NimGame() {
       {nimSum !== null && (
         <Typography variant="h6" sx={{ marginTop: 2 }}>
           Nim Sum: {nimSum}
+        </Typography>
+      )}
+
+      {calculationSteps.length > 0 && ( // Display calculation steps
+        <Typography variant="h6" sx={{ marginTop: 2 }}>
+          Calculation Steps: {calculationSteps.join(', ')}
         </Typography>
       )}
     </Box>
