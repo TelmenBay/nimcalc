@@ -1,143 +1,173 @@
-// page.jsx
-'use client';
+'use client'
 import React, { useState } from 'react';
 
-const alpha = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
-
-let nnnMemoR = {};
-
-function nnnCalc(piles, adj_matrix, setLogs) {
-  nnnMemoR = {};
-  let maxNimValue = 0;
-  let logs = [];
-  for (let i = 0; i < piles.length; i++) {
-    logs.push(`Calculating nim value starting with pile ${alpha[i]}`);
-    maxNimValue = Math.max(maxNimValue, nnnCalcR(piles, adj_matrix, i, logs));
+class NimCalcR {
+  constructor() {
+    this.alpha = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'];
+    this.nnnMemoR = new Map();
+    this.steps = []; // To track the steps
   }
-  setLogs(logs);
-  return maxNimValue;
-}
 
-function nnnCalcR(piles, adj_matrix, lastPile, logs) {
-  let key = alpha[lastPile] + JSON.stringify(piles);
-  
-  if (nnnMemoR.hasOwnProperty(key)) {
-    logs.push(`Using memoized value for key ${key}: ${nnnMemoR[key]}`);
-    return nnnMemoR[key];
+  // Comparator function to sort dictionary keys
+  dictComparator(a, b) {
+    return a.substring(1).localeCompare(b.substring(1));
   }
-  
-  logs.push(`Processing configuration for key ${key}`);
-  
-  let end_game = true;
-  for (let neighbor_pile = 0; neighbor_pile < piles.length; neighbor_pile++) {
-    if (adj_matrix[lastPile][neighbor_pile] === 1 && piles[neighbor_pile] > 0) {
-      end_game = false;
-      break;
+
+  // Main function to calculate nim values starting from all piles
+  nnnCalc(piles, adjMatrix) {
+    this.nnnMemoR.clear();
+    this.steps = []; // Clear steps before each calculation
+    let maxNimValue = 0;
+    for (let i = 0; i < piles.length; i++) {
+      maxNimValue = Math.max(maxNimValue, this.nnnCalcR(piles, adjMatrix, i));
     }
+    return { maxNimValue, steps: this.steps }; // Return both max value and steps
   }
-  
-  if (end_game) {
-    nnnMemoR[key] = 0;
-    logs.push(`Game over for key ${key}, storing mex value 0`);
-    return 0;
-  }
-  
-  let optionsValSet = new Set();
-  for (let neighbor_pile = 0; neighbor_pile < piles.length; neighbor_pile++) {
-    if (adj_matrix[lastPile][neighbor_pile] === 1 && piles[neighbor_pile] > 0) {
-      for (let stones_to_remove = 1; stones_to_remove <= piles[neighbor_pile]; stones_to_remove++) {
-        let new_piles = [...piles];
-        new_piles[neighbor_pile] -= stones_to_remove;
-        logs.push(`Removing ${stones_to_remove} stones from pile ${alpha[neighbor_pile]}, new configuration: ${JSON.stringify(new_piles)}`);
-        optionsValSet.add(nnnCalcR(new_piles, adj_matrix, neighbor_pile, logs));
+
+  // Function to calculate nim values for a specific game
+  nnnCalcR(piles, adjMatrix, lastPile) {
+    const key = this.alpha[lastPile] + JSON.stringify(piles);
+
+    if (this.nnnMemoR.has(key)) {
+      return this.nnnMemoR.get(key);
+    }
+
+    let endGame = true;
+    for (let neighborPile = 0; neighborPile < piles.length; neighborPile++) {
+      if (adjMatrix[lastPile][neighborPile] === 1 && piles[neighborPile] > 0) {
+        endGame = false;
+        break;
       }
     }
+
+    if (endGame) {
+      this.nnnMemoR.set(key, 0);
+      this.steps.push(`${this.alpha[lastPile]}${JSON.stringify(piles)}=0`); // Log end game step
+      return 0;
+    }
+
+    const optionsValSet = new Set();
+    for (let neighborPile = 0; neighborPile < piles.length; neighborPile++) {
+      if (adjMatrix[lastPile][neighborPile] === 1 && piles[neighborPile] > 0) {
+        for (let stonesToRemove = 1; stonesToRemove <= piles[neighborPile]; stonesToRemove++) {
+          const newPiles = [...piles];
+          newPiles[neighborPile] -= stonesToRemove;
+          const result = this.nnnCalcR(newPiles, adjMatrix, neighborPile);
+          optionsValSet.add(result);
+          this.steps.push(`${this.alpha[lastPile]}${JSON.stringify(newPiles)}=${result}`); // Log each move
+        }
+      }
+    }
+
+    const mexValue = this.calcMex(optionsValSet);
+    this.nnnMemoR.set(key, mexValue);
+    this.steps.push(`${this.alpha[lastPile]}${JSON.stringify(piles)}=${mexValue}`); // Log current step
+    return mexValue;
   }
-  
-  let mex_value = calcMex(optionsValSet);
-  logs.push(`Mex value for key ${key} is ${mex_value}`);
-  nnnMemoR[key] = mex_value;
-  
-  return mex_value;
+
+  // Function to calculate the mex value
+  calcMex(optionsValSet) {
+    let mex = 0;
+    while (optionsValSet.has(mex)) {
+      mex++;
+    }
+    return mex;
+  }
 }
 
-function calcMex(optionsValSet) {
-  let mex = 0;
-  while (optionsValSet.has(mex)) {
-    mex++;
-  }
-  return mex;
-}
+const App = () => {
+  const [piles, setPiles] = useState([0, 0, 0, 0]);
+  const [selectedMatrix, setSelectedMatrix] = useState("Olivia Kelsey");
+  const [result, setResult] = useState(null);
+  const [steps, setSteps] = useState([]); // State to hold steps
 
-const Page = () => {
-  const [selectedOption, setSelectedOption] = useState(0);
-  const [nimValue, setNimValue] = useState(null);
-  const [logs, setLogs] = useState([]);
-
-  const configurations = [
-    { piles: [3, 2, 4, 2], adjM: [[1, 1, 1, 0], [1, 1, 1, 1], [1, 1, 1, 1], [0, 1, 1, 1]] },
-    { piles: [2, 1, 1], adjM: [[1, 1, 0], [1, 1, 1], [0, 1, 1]] },
-    { piles: [1, 1], adjM: [[1, 1], [1, 1]] },
-    { piles: [2, 1, 1, 1], adjM: [[1, 1, 1, 0], [1, 1, 1, 1], [1, 1, 1, 1], [0, 1, 1, 1]] }
-  ];
-
-  const handleSelect = (event) => {
-    setSelectedOption(parseInt(event.target.value, 10));
+  // Define matrices
+  const matrices = {
+    "Olivia Kelsey": [
+      [1, 1, 1, 0],
+      [1, 1, 1, 1],
+      [1, 1, 1, 1],
+      [0, 1, 1, 1]
+    ],
+    "Alexis Junior Cameron": [
+      [1, 1, 0, 0],
+      [1, 1, 1, 0],
+      [0, 1, 1, 0],
+      [0, 0, 0, 0]
+    ],
+    "Tyshaun Israel": [
+      [1, 1, 0, 0],
+      [1, 1, 1, 0],
+      [0, 1, 1, 1],
+      [0, 0, 1, 1]
+    ],
+    "Isabella Madison": [
+      [1, 1, 0, 0],
+      [1, 1, 1, 1],
+      [0, 1, 1, 1],
+      [0, 1, 1, 1]
+    ]
   };
 
+  // Handle pile input changes
+  const handlePileChange = (index, value) => {
+    const newPiles = [...piles];
+    newPiles[index] = parseInt(value, 10) || 0;
+    setPiles(newPiles);
+  };
+
+  // Calculate result using NimCalcR
   const handleCalculate = () => {
-    const { piles, adjM } = configurations[selectedOption];
-    const result = nnnCalc(piles, adjM, setLogs);
-    setNimValue(result);
+    const selectedMatrixValues = matrices[selectedMatrix];
+    const nimCalcR = new NimCalcR();
+    const { maxNimValue, steps } = nimCalcR.nnnCalc(piles, selectedMatrixValues);
+    setResult(maxNimValue);
+    setSteps(steps); // Set the steps for display
+  };
+
+  // Handle form submission
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    handleCalculate();
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>Nim Game Calculation</h1>
-      <label htmlFor="configSelect">Choose a configuration: </label>
-      <select id="configSelect" value={selectedOption} onChange={handleSelect}>
-        <option value={0}>Option 1: Piles [3, 2, 4, 2]</option>
-        <option value={1}>Option 2: Piles [2, 1, 1]</option>
-        <option value={2}>Option 3: Piles [1, 1]</option>
-        <option value={3}>Option 4: Piles [2, 1, 1, 1]</option>
-      </select>
-
-      <button style={{ marginLeft: '10px' }} onClick={handleCalculate}>Calculate</button>
-
-      {nimValue !== null && (
-        <div style={{
-          marginTop: '20px',
-          padding: '10px',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          width: '300px',
-          textAlign: 'center',
-          backgroundColor: '#f9f9f9'
-        }}>
-          <h2>Calculated Nim Value</h2>
-          <p>{nimValue}</p>
-        </div>
-      )}
-
-      {logs.length > 0 && (
-        <div style={{
-          marginTop: '20px',
-          padding: '10px',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          backgroundColor: '#f1f1f1',
-          whiteSpace: 'pre-wrap',
-          maxHeight: '300px',
-          overflowY: 'auto'
-        }}>
-          <h3>Calculation Steps</h3>
-          {logs.map((log, index) => (
-            <p key={index}>{log}</p>
+    <div>
+      <h1>Nim Game Calculator</h1>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Piles:</label>
+          {piles.map((pile, index) => (
+            <input
+              key={index}
+              type="number"
+              value={pile}
+              onChange={(e) => handlePileChange(index, e.target.value)}
+              required
+            />
           ))}
+        </div>
+        <div>
+          <label>Choose Matrix:</label>
+          <select value={selectedMatrix} onChange={(e) => setSelectedMatrix(e.target.value)}>
+            {Object.keys(matrices).map((matrix) => (
+              <option key={matrix} value={matrix}>
+                {matrix}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="submit">Calculate</button>
+      </form>
+      {result !== null && (
+        <div>
+          <h2>Max Nim Value: {result}</h2>
+          <h3>Calculation Steps:</h3>
+          <pre>{steps.join('\n')}</pre> {/* Display the steps */}
         </div>
       )}
     </div>
   );
 };
 
-export default Page;
+export default App;
